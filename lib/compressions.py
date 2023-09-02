@@ -1,22 +1,6 @@
 import numpy as np
 from scipy.special import softmax
 
-sigma = lambda x : 1 / (1 + np.exp(-x))
-
-def gradf(theta, X, y):
-    N, dim = X.shape
-    res = np.zeros(dim)
-    for i in range(N):
-        res += (y[i] - sigma(theta @ X[i].T)) * X[i]
-    return res
-
-def calculateLoss(theta, X, y):
-    N, dim = X.shape
-    res = 0
-    for i in range(N):
-        res += y[i] * np.log(sigma(theta @ X[i].T)) + (1 - y[i]) * np.log(1 - sigma(theta @ X[i].T))
-    return res
-
 
 def getTopKMask(x, k):
     N = x.shape[0]
@@ -26,10 +10,12 @@ def getTopKMask(x, k):
         mask[xSorted[i][0]] = 1
     return mask
 
+
 def topK(gradient, k=None):
     if not k:
         k = gradient.shape[0] // 2
     return gradient * getTopKMask(gradient, k)
+
 
 def uniformCompression(gradient, k=None):
     N = gradient.shape[0]
@@ -39,7 +25,9 @@ def uniformCompression(gradient, k=None):
     np.random.shuffle(mask)
     return gradient * mask
 
+
 def compressedGD(gradf, theta0, X, y, compression=None, k=None, name="", max_iter=1000000, tol=1e-2):
+    print(f'start {name}')
     theta = theta0.copy()
     iteration = 0
     gradients = []
@@ -62,6 +50,7 @@ def compressedGD(gradf, theta0, X, y, compression=None, k=None, name="", max_ite
             break
         if iteration >= max_iter:
             break
+    print(f'end {name}')
     return {
         "num_iter": iteration,
         "gradients": gradients,
@@ -71,6 +60,7 @@ def compressedGD(gradf, theta0, X, y, compression=None, k=None, name="", max_ite
         "name": name,
         "k": k,
     }
+
 
 def stochasticCompression(gradient0, probability, k=None, alpha=0.05):
     gradient = gradient0.copy()
@@ -82,7 +72,9 @@ def stochasticCompression(gradient0, probability, k=None, alpha=0.05):
     probability = np.ones(N) - mask
     return gradient, probability
 
+
 def stochasticCompressedGD(gradf, theta0, X, y, compression, k=None, name="", max_iter=1000000, tol=1e-2):
+    print(f'start {name}')
     theta = theta0.copy()
     iteration = 0
     gradients = []
@@ -103,6 +95,7 @@ def stochasticCompressedGD(gradf, theta0, X, y, compression, k=None, name="", ma
             break
         if iteration >= max_iter:
             break
+    print(f'end {name}')
     return {
         "num_iter": iteration,
         "gradients": gradients,
