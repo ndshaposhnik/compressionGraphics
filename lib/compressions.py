@@ -26,31 +26,31 @@ def uniformCompression(gradient, k=None):
     return gradient * mask
 
 
-def compressedGD(gradf, theta0, X, y, compression=None, k=None, name="", max_iter=1000000, tol=1e-2):
-    print(f'start {name}')
-    theta = theta0.copy()
+def compressedGD(function, x0=None, compression=None, k=None, name="", max_iter=1000000, tol=1e-2, alpha=0.04):
+    if x0:
+        x = x0.copy()
+    else:
+        x = function.get_initial_x()
     iteration = 0
     gradients = []
     conv_array = []
     if not compression:
-        k = theta.shape[0]
+        k = x.shape[0]
     if not k:
-        k = theta.shape[0] // 2
+        k = x.shape[0] // 2
     while True:
-        alpha = 0.04
-        conv_array.append(theta)
-        gradient0 = gradf(theta, X, y)
+        conv_array.append(x)
+        gradient0 = function.gradient(x)
         gradients.append(np.linalg.norm(gradient0))
         gradient = gradient0.copy()
         if compression:
             gradient = compression(gradient)
-        theta = theta + alpha * gradient
+        x = x + alpha * gradient
         iteration += 1
         if np.linalg.norm(gradient0) < tol:
             break
         if iteration >= max_iter:
             break
-    print(f'end {name}')
     return {
         "num_iter": iteration,
         "gradients": gradients,
@@ -73,23 +73,25 @@ def stochasticCompression(gradient0, probability, k=None, alpha=0.05):
     return gradient, probability
 
 
-def stochasticCompressedGD(gradf, theta0, X, y, compression, k=None, name="", max_iter=1000000, tol=1e-2):
-    print(f'start {name}')
-    theta = theta0.copy()
+def stochasticCompressedGD(function, compression, x0=None, k=None, name="", max_iter=1000000, tol=1e-2, alpha=0.04):
+    if x0:
+        x = x0.copy()
+    else:
+        x = function.get_initial_x()
+    d = x.shape[0]
     iteration = 0
     gradients = []
     conv_array = []
-    probability = np.ones(theta.shape[0])
+    probability = np.ones(d)
     if not k:
-        k = theta.shape[0] // 2
+        k = d // 2
     while True:
-        alpha = 0.04
-        conv_array.append(theta)
-        gradient0 = gradf(theta, X, y)
+        conv_array.append(x)
+        gradient0 = function.gradient(x)
         gradients.append(np.linalg.norm(gradient0))
         gradient = gradient0.copy()
         gradient, probability = compression(gradient, probability)
-        theta = theta + alpha * gradient
+        x = x + alpha * gradient
         iteration += 1
         if np.linalg.norm(gradient0) < tol:
             break
