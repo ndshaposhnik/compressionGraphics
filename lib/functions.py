@@ -13,10 +13,10 @@ class Function(ABC):
     def gradient(self, x):
         pass
 
-    def get_dimention(self):
+    def getDimention(self):
         pass
 
-    def get_initial_x(self):
+    def getInitialX(self):
         pass
 
 
@@ -43,8 +43,8 @@ class LogisticRegression(Function):
             res += (self._y[i] - sigma(theta @ self._X[i].T)) * self._X[i]
         return res
 
-    def get_dimention(self):
+    def getDimention(self):
         return self._dim
 
-    def get_initial_x(self):
+    def getInitialX(self):
         return np.zeros(self._dim)
