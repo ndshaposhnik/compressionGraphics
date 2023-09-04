@@ -3,17 +3,23 @@ from scipy.special import softmax
 
 
 class Compressor:
-    def __init__(compression, k):
+    def __init__(self, compression, k):
         self.compression = compression
         self.k = k
-        self.probabilit
 
-    def compress(x):
-        return self.compression()
-
+    def compress(self, x):
+        return self.compression(x, k=self.k)
 
 
-def getTopKMask(x, k):
+class SmartCompressor(Compressor):
+    def __init__(self, compression, k):
+        super().__init__(compression, k)
+        
+    def compress(self, x, probability):
+        return self.compression(x, probability=probability, k=self.k)
+
+
+def _getTopKMask(x, k):
     d = x.shape[0]
     xSorted = sorted(list(enumerate(x)), key=lambda elem : abs(elem[1]), reverse=True)
     mask = np.zeros(d)
@@ -23,7 +29,7 @@ def getTopKMask(x, k):
 
 
 def topK(gradient, k):
-    return gradient * getTopKMask(gradient, k)
+    return gradient * _getTopKMask(gradient, k)
 
 
 def uniformCompression(gradient, k):
@@ -33,53 +39,15 @@ def uniformCompression(gradient, k):
     return gradient * mask
 
 
-def compressedGD(function, x0=None, compression=None, k=None, name="", max_iter=1000000, tol=1e-2, alpha=0.04):
-    if x0:
-        x = x0.copy()
-    else:
-        x = function.getInitialX()
-    iteration = 0
-    gradients = []
-    conv_array = []
-    if not compression:
-        k = x.shape[0]
-    if not k:
-        k = x.shape[0] // 2
-    while True:
-        conv_array.append(x)
-        gradient0 = function.gradient(x)
-        gradients.append(np.linalg.norm(gradient0))
-        gradient = gradient0.copy()
-        if compression:
-            gradient = compression(gradient, k=k)
-        x = x + alpha * gradient
-        iteration += 1
-        if np.linalg.norm(gradient0) < tol:
-            break
-        if iteration >= max_iter:
-            break
-    return {
-        "num_iter": iteration,
-        "gradients": gradients,
-        "coords": list(range(0, iteration * k, k)),
-        "tol": np.linalg.norm(gradient),
-        "conv_array": conv_array,
-        "name": name,
-        "k": k,
-    }
-
-
-def ban2InARow(gradient0, probability, k):
-    gradient = gradient0.copy()
-    mask = getTopKMask(gradient * probability, k)
+def ban2InARow(gradient, probability, k):
+    mask = _getTopKMask(gradient * probability, k)
     probability = np.ones_like(mask) - mask
     return gradient * mask, probability
 
 
-def reduceProbability(gradient0, probability, k, alpha=0.7):
-    d = gradient0.shape[0]
-    gradient = gradient0.copy()
-    mask = getTopKMask(gradient * probability, k)
+def reduceProbability(gradient, probability, k, alpha=0.5):
+    d = gradient.shape[0]
+    mask = _getTopKMask(gradient * probability, k)
     inv_mask = np.ones_like(mask) - mask
     probability = softmax(gradient)
     sumReduced = np.sum(mask * probability * (1 - alpha))
@@ -88,34 +56,16 @@ def reduceProbability(gradient0, probability, k, alpha=0.7):
     return gradient * mask, probability
 
 
-def stochasticCompressedGD(function, compression, x0=None, name="", max_iter=1000000, tol=1e-2, alpha=0.04):
-    if x0:
-        x = x0.copy()
-    else:
-        x = function.getInitialX()
-    d = x.shape[0]
-    iteration = 0
-    gradients = []
-    conv_array = []
-    probability = np.ones(d) / d
-    while True:
-        conv_array.append(x)
-        gradient0 = function.gradient(x)
-        gradients.append(np.linalg.norm(gradient0))
-        gradient = gradient0.copy()
-        gradient, probability = compression(gradient, probability, k)
-        x = x + alpha * gradient
-        iteration += 1
-        if np.linalg.norm(gradient0) < tol:
-            break
-        if iteration >= max_iter:
-            break
-    return {
-        "num_iter": iteration,
-        "gradients": gradients,
-        "coords": list(range(0, iteration * k, k)),
-        "tol": np.linalg.norm(gradient),
-        "conv_array": conv_array,
-        "name": name,
-        "k": k,
-    }
+def reduceProbabilitySoftMax(gradient0, probability, k, alpha=0.5):
+    gradient = gradient0.copy()
+    mask = _getTopKMask(gradient * probability, k)
+    inv_mask = np.ones_like(mask) - mask
+    gradient *= (inv_mask + mask * alpha)
+    probability = softmax(gradient)
+    return gradient0 * mask, probability
+
+
+def compressionWithPenalty(gradient0, penalty, k, alpha=0.01):
+    gradient = gradient0.copy()
+    mask = _getTopKMask(gradient * penalty, k)
+

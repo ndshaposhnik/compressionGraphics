@@ -3,7 +3,7 @@ from abc import ABC
 from scipy.special import softmax
 
 
-sigma = lambda x : 1 / (1 + np.exp(-x))
+_sigma = lambda x : 1 / (1 + np.exp(-x))
 
 
 class Function(ABC):
@@ -31,8 +31,8 @@ class LogisticRegression(Function):
         loss = 0
         for i in range(self._N):
             loss += (
-                self._y[i] * np.log(sigma(theta @ self._X[i].T))
-                + (1 - self._y[i]) * np.log(1 - sigma(theta @ self._X[i].T))
+                self._y[i] * np.log(_sigma(theta @ self._X[i].T))
+                + (1 - self._y[i]) * np.log(1 - _sigma(theta @ self._X[i].T))
             )
 
         return loss
@@ -40,7 +40,7 @@ class LogisticRegression(Function):
     def gradient(self, theta):
         res = np.zeros(self._dim)
         for i in range(self._N):
-            res += (self._y[i] - sigma(theta @ self._X[i].T)) * self._X[i]
+            res += (self._y[i] - _sigma(theta @ self._X[i].T)) * self._X[i]
         return res
 
     def getDimention(self):
