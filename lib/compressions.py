@@ -54,23 +54,22 @@ def ban2InARow(gradient, probability, k):
 
 
 def reduceProbability(gradient, probability, k, penalty=0.5):
-    d = gradient.shape[0]
     mask = _getTopKMask(gradient * probability, k)
     inv_mask = np.ones_like(mask, dtype=np.intc) - mask
     probability = softmax(gradient)
     sumReduced = np.sum(mask * probability * (1 - penalty))
     probability -= mask * probability * (1 - penalty)
-    probability += inv_mask * sumReduced / (d - k)
+    probability += inv_mask * sumReduced / (gradient.shape[0] - k)
     return gradient * mask, probability
 
 
-def reduceProbabilitySoftMax(gradient0, probability, k, penalty=0.5):
-    gradient = gradient0.copy()
+def newReduceProbability(gradient, probability, k, penalty=0.5):
     mask = _getTopKMask(gradient * probability, k)
     inv_mask = np.ones_like(mask, dtype=np.intc) - mask
-    gradient *= (inv_mask + mask * penalty)
-    probability = softmax(gradient)
-    return gradient0 * mask, probability
+    sumReduced = np.sum(mask * probability * (1 - penalty))
+    probability -= mask * probability * (1 - penalty)
+    probability += inv_mask * sumReduced / (gradient.shape[0] - k)
+    return gradient * mask, probability
 
 
 def compressionWithPenalty(gradient, probability, k, dropsTo=0.0, step=0.25):

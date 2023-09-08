@@ -13,11 +13,9 @@ def compressedGD(function, compressor, x0=None, name="", max_iter=1000000, tol=1
     coords_cnt = 0
     while True:
         conv_array.append(x)
-        gradient0 = function.gradient(x)
-        gradients.append(np.linalg.norm(gradient0))
-        gradient = gradient0.copy()
-        gradient = compressor.compress(gradient)
-        x = x + alpha * gradient
+        gradient = function.gradient(x)
+        gradients.append(np.linalg.norm(gradient))
+        x = x + alpha * compressor.compress(gradient)
         iteration += 1
         coords_cnt += compressor.k
         coords.append(coords_cnt)
