@@ -34,7 +34,6 @@ class LogisticRegression(Function):
                 self._y[i] * np.log(_sigma(theta @ self._X[i].T))
                 + (1 - self._y[i]) * np.log(1 - _sigma(theta @ self._X[i].T))
             )
-
         return loss
 
     def gradient(self, theta):
