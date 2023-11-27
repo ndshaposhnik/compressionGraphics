@@ -13,7 +13,7 @@ def _getTopKMask(x, k):
     return mask
 
 
-class Compression: # добавить информацию по компрессору
+class Compression:
     def __init__(self, dim):
         pass
 
@@ -27,15 +27,14 @@ class NoneCompressor(Compression):
         self.name = "Without compression"
 
     def compress(self, tensor):
-        assert tensor.size == self.dim, "tensor size is not equal to compressor dim"
-        return (tensor, self.dim)
+        return (tensor.copy(), self.dim)
 
 
 class TopKCompressor(Compression):
     def __init__(self, dim, alpha):
         self.dim = dim
         self.k = int(self.dim * alpha)
-        self.name = f"TopK Compressor, alpha={self.alpha}"
+        self.name = f"TopK, alpha={alpha}"
 
     def compress(self, tensor):
         return (tensor * _getTopKMask(tensor, self.k), self.k)
@@ -45,7 +44,7 @@ class RandKCompressor(Compression):
     def __init__(self, dim, alpha):
         self.dim = dim
         self.k = int(self.dim * alpha)
-        self.name = f"RandK Compressor, alpha={self.alpha}"
+        self.name = f"RandK, alpha={alpha}"
 
     def compress(self, tensor):
         mask = np.append(np.ones(self.k, dtype=np.intc), np.zeros(self.dim - self.k, dtype=np.intc))
@@ -59,7 +58,7 @@ class ReduceProbabilityCompressor(Compression):
         self.k = int(self.dim * alpha)
         self.probability = np.ones(self.dim) / self.dim
         self.penalty = penalty
-        self.name = f"ReduceProbabilityCompressor, alpha={self.alpha}, penalty={self.penalty}"
+        self.name = f"ReduceProbability, alpha={alpha}, penalty={penalty}"
 
     def compress(self, tensor):
         mask = _getTopKMask(tensor * self.probability, self.k)
@@ -77,14 +76,14 @@ class NewReduceProbabilityCompressor(Compression):
         self.k = int(self.dim * alpha)
         self.probability = np.ones(self.dim) / self.dim
         self.penalty = penalty
-        self.name = f"newreduceprobabilitycompressor, alpha={self.alpha}, penalty={self.penalty}"
+        self.name = f"NewReduceProbability, alpha={alpha}, penalty={penalty}"
 
     def compress(self, tensor):
-        mask = _getTopKMask(tensor * probability, self.k)
+        mask = _getTopKMask(tensor * self.probability, self.k)
         inv_mask = np.ones_like(mask) - mask
         sumReduced = np.sum(mask * self.probability * (1 - self.penalty))
-        probability -= mask * self.probability * (1 - self.penalty)
-        probability += inv_mask * sumReduced / (self.dim - self.k)
+        self.probability -= mask * self.probability * (1 - self.penalty)
+        self.probability += inv_mask * sumReduced / (self.dim - self.k)
         return tensor * mask, self.k
 
 
@@ -92,12 +91,14 @@ class TopUnknownCompressor(Compression):
     def __init__(self, dim, beta):
         self.dim = dim
         self.beta = beta
-        self.name = f"TopUnknownCompressor, beta={self.beta}"
+        self.name = f"TopUnknown, beta={beta}"
 
     def compress(self, tensor):
         bound = self.beta * np.linalg.norm(tensor) / np.sqrt(self.dim)
         mask = tensor >= bound
-        return tensor * mask, np.sum(m)
+        if np.sum(mask) == 0:
+            mask = _getTopKMask(tensor, 1)
+        return tensor * mask, np.sum(mask)
 
 
 class PenaltyCompressor(Compression):
@@ -106,14 +107,14 @@ class PenaltyCompressor(Compression):
         self.k = int(self.dim * alpha)
         self.dropsTo = dropsTo
         self.step = step
-        self.penalty = torch.full((self.dim,), 1 / self.dim, dtype=torch.float, device='cuda:0')
-        self.name = f"PenaltyCompressor, alpha={self.alpha}, dropsTo={self.dropsTo}, step={self.step}"
+        self.penalty = np.ones(self.dim) / self.dim
+        self.name = f"Penalty, alpha={alpha}, dropsTo={dropsTo}, step={step}"
 
     def compress(self, tensor):
         mask = _getTopKMask(tensor * self.penalty, self.k)
-        self.penalty += self.step * torch.ones_like(self.penalty)
-        self.penalty = np.minimum(self.penalty, torch.ones_like(self.penalty))
-        inv_mask = torch.ones_like(mask) - mask
+        self.penalty += self.step * np.ones_like(self.penalty)
+        self.penalty = np.minimum(self.penalty, np.ones_like(self.penalty))
+        inv_mask = np.ones_like(mask) - mask
         self.penalty = inv_mask * self.penalty + self.dropsTo * mask
         return tensor * mask, self.k
 
