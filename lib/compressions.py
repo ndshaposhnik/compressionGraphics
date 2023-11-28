@@ -118,3 +118,24 @@ class PenaltyCompressor(Compression):
         self.penalty = inv_mask * self.penalty + self.dropsTo * mask
         return tensor * mask, self.k
 
+
+class MarinaCompressor(Compression):
+    def __init__(self, dim, p, compressor):
+        self.dim = dim
+        self.p = p
+        self.compressor = compressor
+        self.prevG = None
+        self.prevNabla = None
+        self.name = f'Marina, p={p}, compressor={compressor.name}'
+
+    def compress(self, nabla):
+        c = np.random.binomial(size=1, n=1, p=self.p)[0]
+        if c == 1 or self.prevG is None:
+            self.prevG = nabla
+            self.prevNabla = nabla
+            return nabla, self.dim
+        result, k = self.compressor.compress(nabla - self.prevNabla)
+        result += self.prevG
+        self.prevNabla = nabla
+        self.prevG = result
+        return result, k
