@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.special import softmax
+import random
 
 from abc import ABC
 
@@ -139,3 +140,37 @@ class MarinaCompressor(Compression):
         self.prevNabla = nabla
         self.prevG = result
         return result, k
+
+
+class MarkovRandKCompressor(Compression):
+    def __init__(self, dim, alpha, penalty):
+        self.dim = dim
+        self.k = int(self.dim * alpha)
+        self.probability = np.ones(self.dim) / self.dim
+        self.penalty = penalty
+        self.name = f"Markov RandK, alpha={alpha}, penalty={penalty}"
+
+    def compress(self, tensor):
+        mask = _getTopKMask(self.probability, self.k)
+        inv_mask = np.ones_like(mask) - mask
+        sumReduced = np.sum(mask * self.probability * (1 - self.penalty))
+        self.probability -= mask * self.probability * (1 - self.penalty)
+        self.probability += inv_mask * sumReduced / (self.dim - self.k)
+        return tensor * mask, self.k
+    
+
+class RandomizedKCompressor(Compression):
+    def __init__(self, dim, compressor, minAlpha, maxAlpha):
+        self.dim = dim
+        self.compressor = compressor
+        self.minK = int(dim * minAlpha)
+        self.maxK = int(dim * maxAlpha)
+        assert self.minK <= self.maxK
+        self.name = f'RandomizedKCompressor, ({minAlpha}, {maxAlpha})'
+
+    def getK(self):
+        return random.randint(self.minK, self.maxK)
+
+    def compress(self, tensor):
+        self.compressor.k = self.getK()
+        return self.compressor.compress(tensor)
