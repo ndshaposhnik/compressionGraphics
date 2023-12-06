@@ -35,11 +35,8 @@ class ReduceProbabilityCompressor(BaseCompressor):
 
     def compress(self, tensor):
         mask = getTopKMask(tensor * self.probability, self.k)
-        inv_mask = np.ones_like(mask) - mask
-        self.probability = softmax(tensor)
-        sumReduced = np.sum(mask * self.probability * (1 - self.penalty))
-        self.probability -= mask * self.probability * (1 - self.penalty)
-        self.probability += inv_mask * sumReduced / (self.dim - self.k)
+        self.probability = softmax(tensor) # difference with NewReduceProbability
+        self.probability = change_probability(self.probability, mask, self.penalty)
         return tensor * mask, self.k
 
 
@@ -53,10 +50,7 @@ class NewReduceProbabilityCompressor(BaseCompressor):
 
     def compress(self, tensor):
         mask = getTopKMask(tensor * self.probability, self.k)
-        inv_mask = np.ones_like(mask) - mask
-        sumReduced = np.sum(mask * self.probability * (1 - self.penalty))
-        self.probability -= mask * self.probability * (1 - self.penalty)
-        self.probability += inv_mask * sumReduced / (self.dim - self.k)
+        self.probability = change_probability(self.probability, mask, self.penalty)
         return tensor * mask, self.k
 
 
