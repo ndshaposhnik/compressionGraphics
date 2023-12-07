@@ -33,7 +33,7 @@ def change_probability_subtraction(probability, mask, penalty):
     tmp_probability -= mask * penalty
     tmp_probability = np.maximum(tmp_probability, 0)
 
-    sumReduced = probability - tmp_probability
+    sumReduced = np.sum(probability - tmp_probability)
     probability = tmp_probability
 
     probability += inv_mask * sumReduced / (n - k)

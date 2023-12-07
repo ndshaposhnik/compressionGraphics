@@ -6,6 +6,15 @@ from .base_compressor import BaseCompressor
 from .common import *
 
 
+class NoneCompressor(BaseCompressor):
+    def __init__(self, dim):
+        self.dim = dim
+        self.name = "Without compression"
+
+    def compress(self, tensor):
+        return (tensor.copy(), self.dim)
+
+
 class RandKCompressor(BaseCompressor):
     def __init__(self, dim, alpha):
         self.dim = dim
