@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 
 
 def compressedGD(function, compressor, x0=None, max_iter=1000000, tol=1e-2, alpha=0.04):
@@ -7,14 +8,14 @@ def compressedGD(function, compressor, x0=None, max_iter=1000000, tol=1e-2, alph
     else:
         x = function.getInitialX()
     iteration = 0
-    gradients = []
+    loss = []
     conv_array = []
     coords = []
     coords_cnt = 0
-    while True:
+    for _ in tqdm(range(max_iter)):
         conv_array.append(x)
         gradient = function.gradient(x)
-        gradients.append(np.linalg.norm(gradient))
+        loss.append(function.loss(x))
         compressedGradient, k = compressor.compress(gradient)
         x += alpha * compressedGradient
         iteration += 1
@@ -26,7 +27,7 @@ def compressedGD(function, compressor, x0=None, max_iter=1000000, tol=1e-2, alph
             break
     return {
         "num_iter": iteration,
-        "gradients": gradients,
+        "loss": loss,
         "coords": coords,
         "tol": np.linalg.norm(gradient),
         "conv_array": conv_array,

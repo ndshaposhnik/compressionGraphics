@@ -3,7 +3,7 @@ from scipy.special import softmax
 import random
 
 from .base_compressor import BaseCompressor
-from .common import *
+from . import common
 
 
 class NoneCompressor(BaseCompressor):
@@ -36,8 +36,8 @@ class MultiplicationPenaltyCompressor(BaseCompressor):
         self.name = f"MultiplicationPenalty, alpha={alpha}, penalty={penalty}"
 
     def compress(self, tensor):
-        mask = getTopKMask(self.probability, self.k)
-        self.probability = change_probability_multiplication(self.probability, mask, self.penalty)
+        mask = common.getTopKMask(self.probability, self.k)
+        self.probability = common.change_probability_multiplication(self.probability, mask, self.penalty)
         return tensor * mask, self.k
 
 
@@ -50,8 +50,8 @@ class SubtractionPenaltyCompressor(BaseCompressor):
         self.name = f"SubtractionPenalty, alpha={alpha}, penalty={penalty}"
 
     def compress(self, tensor):
-        mask = getTopKMask(self.probability, self.k)
-        self.probability = change_probability_multiplication(self.probability, mask, self.penalty)
+        mask = common.getTopKMask(self.probability, self.k)
+        self.probability = common.change_probability_subtraction(self.probability, mask, self.penalty)
         return tensor * mask, self.k
 
 
@@ -64,7 +64,40 @@ class ExpSmoothingCompressor(BaseCompressor):
         self.name = f"ExpSmoothing, alpha={alpha}, beta={beta}"
 
     def compress(self, tensor):
-        mask = getTopKMask(self.penalty, self.k)
+        mask = common.getTopKMask(self.penalty, self.k)
         inv_mask = np.ones_like(mask) - mask
         self.penalty = self.beta *self.penalty + (1 - self.beta) * inv_mask
         return tensor * mask, self.k
+
+
+class BanLastMCompressor(BaseCompressor):
+    def __init__(self, dim, alpha, M):
+        self.dim = dim
+        self.name = f"BanLast {M}, alpha={alpha}"
+        self.k = int(self.dim * alpha)
+        self.M = M
+        self.history = np.zeros(self.dim, dtype=np.intc)
+
+    def _get_mask(self):
+        zeros = np.nonzero((self.history == 0))[0]
+        assert len(zeros) >= self.k, f'{len(zeros)}, {self.k}'
+        np.random.shuffle(zeros)
+        indices = zeros[:self.k]
+        assert len(indices) == self.k
+        result = np.zeros_like(self.history)
+        np.put(
+            result, indices, np.ones(self.k, dtype=np.intc),
+        )
+        return result
+
+    def _update_history(self, mask):
+        self.history -= np.ones_like(self.history)
+        self.history = np.maximum(self.history, np.zeros_like(self.history))
+        self.history += mask * self.M
+
+    def compress(self, tensor):
+        mask = self._get_mask()
+        self._update_history(mask)
+        assert len(mask.nonzero()) > 0
+        return tensor * mask, self.k
+
